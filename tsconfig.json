@@ -1,0 +1,12 @@
+{
+      "compileOnSave": false,
+      "compilerOptions": {
+          "noEmit": true,
+          "allowJs": true,
+          "checkJs": true,
+          "target": "es2022",
+          "resolveJsonModule": true,
+          "moduleResolution": "Node"
+      }
+}
+  
