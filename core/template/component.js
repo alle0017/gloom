@@ -44,6 +44,11 @@ export default class Component {
       static #cachedTrees = new Map();
 
       /**
+       * @type {Map<string, (args: Record<string,unknown>) => Component>}
+       */
+      static __register = new Map();
+
+      /**
        * @type {Array<string>}
        */
       #cssKeys = [];
@@ -126,7 +131,124 @@ export default class Component {
        * @param {number} refIdx represents the index used by refToArgs
        * @param {Args[]} refToArgs
        */
+      #createRegisteredElement( leaf, args, idx, refToArgs, refIdx){
+            /**
+             * @type {Record<string,unknown>}
+             */
+            const props = {};
+            // prop keys that are ${...}
+            const boundKeys = [];
+            // if an arg is used, then we add it to skip it during the next update
+            let numOfArgs = 0;
+
+            for( let i = 0; i < leaf.attributes.length; i++ ){
+                  const value = leaf.attributes[i][1];
+
+                  if( typeof value == 'string' && value.indexOf( ComponentParser.pointerToReactive ) >= 0 ){
+                        props[leaf.attributes[i][0]] = args[idx + numOfArgs];
+                        boundKeys.push(leaf.attributes[i][0])
+                        numOfArgs++;
+                  }else{
+                        props[leaf.attributes[i][0]] = leaf.attributes[i][1];
+                  }
+            }
+
+            const component = Component.__register.get( leaf.tagName )( props );
+            let root;
+            /**
+             * @type {RenderingResult}
+             */
+            let res;
+
+            if( component instanceof Component ){
+
+                  res = dom.createComponent( 
+                        component, 
+                        leaf, 
+                        numOfArgs < leaf.numOfInterpolations? 
+                              args.slice( idx + numOfArgs, idx + leaf.numOfInterpolations ):
+                              [], 
+                        refToArgs, 
+                        refIdx + numOfArgs 
+                  );
+                  root = document.createTextNode('');
+
+                  res.tag[0].before( root );
+
+                  res.usedArgs = 
+                        res.usedArgs > numOfArgs? 
+                              res.usedArgs - numOfArgs:
+                              numOfArgs;
+
+            }else if( isComponentList( component ) ){
+
+                  res = dom.createComponentList( 
+                        component, 
+                        leaf, 
+                        numOfArgs < leaf.numOfInterpolations? 
+                              args.slice( idx + numOfArgs, idx + leaf.numOfInterpolations ):
+                              [], 
+                        refToArgs, 
+                        refIdx + numOfArgs 
+                  );
+                  root = document.createTextNode('');
+
+                  res.tag[0].before( root );
+
+                  res.usedArgs = 
+                        res.usedArgs > numOfArgs? 
+                              res.usedArgs - numOfArgs:
+                              numOfArgs;
+                  /*res = dom.createComponentList( component, leaf, args.slice( idx + numOfArgs, idx + leaf.numOfInterpolations ), refToArgs, refIdx + numOfArgs );
+                  root = document.createTextNode('');
+
+                  res.usedArgs -= numOfArgs;
+                  res.tag[0].before( root );*/
+            }else{
+
+                  res = {
+                        ...dom.createElement( leaf.tagName, leaf ),
+                        needAttributes: false,
+                        usedArgs: numOfArgs,
+                  };
+                  root = res.tag[0];
+            }
+
+            //res.usedArgs += numOfArgs;    
+
+            if( !refToArgs[ refIdx ] ){
+                  refToArgs[ refIdx ] = {
+                        isRegisteredComponent: true,
+                        root: [root],
+                        props,
+                        children: leaf,
+                        component: {
+                              name: leaf.tagName,
+                              instance: component,
+                        },
+                        boundKeys,
+                  };
+            }else{
+                  refToArgs[ refIdx ].root.push(root);
+            }
+
+            return res;
+      }
+
+      /**
+       * returns the html instance of the component passed as input
+       * @param {Readonly<Tree>} leaf
+       * @param {unknown[]} args
+       * @param {number} idx 
+       * @param {number} refIdx represents the index used by refToArgs
+       * @param {Args[]} refToArgs
+       */
       #createElement( leaf, args, idx, refToArgs, refIdx ) {
+
+
+            if( Component.__register.has( leaf.tagName ) ){
+                  return this.#createRegisteredElement( leaf, args, idx, refToArgs, refIdx );
+            }
 
             const value = args[idx];
 
@@ -139,6 +261,7 @@ export default class Component {
             }
 
             if( value instanceof Component ){
+                  
                   const res = dom.createComponent( value, leaf, args.slice( idx + 1, leaf.numOfInterpolations + 1 ), refToArgs, refIdx );
                   const root = document.createTextNode('');
 
@@ -230,12 +353,10 @@ export default class Component {
        */
       #setAttributes( tag, attributes, args, idx, refToArgs, refIdx ){
 
-            // add all the keys that scopes the components style
-            this.#cssKeys.length && tag.classList.add( ...this.#cssKeys );
-
             for( let i = 0; i < attributes.length; i++ ){
-                  
+
                   if( attributes[i][1] == ComponentParser.pointerToReactive ){
+
                         const arg = args[idx];
 
                         if( arg instanceof Signal ){
@@ -350,6 +471,10 @@ export default class Component {
                         tag.setAttribute( attributes[i][0], /**@type {string}*/(attributes[i][1]) );
                   }
             }
+
+            // add all the keys that scopes the components style
+            this.#cssKeys.length && tag.classList.add( ...this.#cssKeys );
+            
             return idx;
       }
 
@@ -515,11 +640,33 @@ export default class Component {
                   const self = this.#args[i];
                   const other = args[i];
 
+                  if( this.#refToArgs[i].isRegisteredComponent ){
+                        // skip the component used properties
+
+                        for( let j = 0; j < this.#refToArgs[i].boundKeys.length; j++ ){
+                              this.#refToArgs[i].props[this.#refToArgs[i].boundKeys[j]] = args[ i + j ];
+                        }
+
+                        const self = this.#refToArgs[i].component.instance;
+                        const other = Component.__register.get( this.#refToArgs[i].component.name )( this.#refToArgs[i].props );
+
+
+                        if( self.isEqualTo( other ) ){
+                              self.update( ...other.#args );
+                        }else{
+                              self.dispose();
+                              this.#refToArgs[i].component.instance = other;
+                        }
+
+                        i += this.#refToArgs[i].boundKeys.length;
+                  }
+
                   if( self == other ){
                         continue;
                   }
 
                   toUpdate.push( i );
+
 
                   if( self instanceof Component && other instanceof Component ){
 
@@ -616,7 +763,13 @@ export default class Component {
                                     isRef: true,
                                     root: this.#refToArgs[i].root,
                               };
-                        }else if( this.#refToArgs[i].isTextNode || this.#refToArgs[i].isTagName || this.#refToArgs[i].isAttributeValue || this.#refToArgs[i].isEvent || this.#refToArgs[i].isCssKey ){
+                        }else if( 
+                              this.#refToArgs[i].isTextNode || 
+                              this.#refToArgs[i].isTagName || 
+                              this.#refToArgs[i].isAttributeValue || 
+                              this.#refToArgs[i].isEvent || 
+                              this.#refToArgs[i].isCssKey 
+                        ){
                               this.#clearReferences( i );
                         }else{
                               throw new TypeError("no match for the type you are interpolating");

@@ -45,8 +45,30 @@ Gloom, although is implemented as a class based framework internally, exposes on
       . `onError( (e: Error)=>void ): void`: called when an error happens during the component mount/update phase
 
 - `createContext<T extends {}>(context: T): () => T`: create a function that, similar to react createContext, can be shared in all your code to get a contextual object.
-
-- `createRoot( Component, HTMLElement ): void` attaches a virtual tree of Components to the DOM
+- `GApp`: object that contains 2 methods:
+      . `createRoot( Component, HTMLElement ): void` attaches a virtual tree of Components to the DOM
+      . `registerComponent(component: (args: Record<string, unknown> ) => Component, name?: string ): typeof GApp` : !EXPERIMENTAL! register a component function, so that, if you use the tag in the html, the registered function is called instead. Like:
+      ```javascript
+      // watch the todo app for comparison
+      html`
+            <style key=${style}></style>
+            <div>
+                  <NewTodo onAdded=${/**@param {string} d*/ d => {
+                        todoList.value.push(d)
+                        todoList.value = todoList.value;
+                  }}/>
+                  <TodoList list=${todoList}/>
+            </div>
+      `
+      // when creating the app
+      GApp
+      // this is mandatory, otherwise the NewTodo registration will throw 
+      // an error, caused by the fact that high-order function returns 
+      // unnamed functions
+      .registerComponent( NewTodo, 'NewTodo' )
+      .registerComponent(TodoList)
+      .createRoot(App(), document.body)
+      ```
 
 - `css`: tag function that returns a scoped css key, that can be used to style your component
 

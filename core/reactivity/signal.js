@@ -202,13 +202,13 @@ export default class Signal {
             
             return new Effect(
                   () =>{ 
+
                         if( this.#value instanceof Array ){
                               const res = [];
 
                               for( let i = 0; i < this.#value.length; i++){
                                     res.push( callback( this.#value[i], i ) )
                               }
-                              console.log( res )
                               return res;
                         }else{
                               //@ts-ignore

@@ -1,4 +1,4 @@
-import { html, $signal, $effect, $ref, createRoot, css, useLifecycle } from "./core/index.js"
+import { html, $signal, $effect, $ref, css, useLifecycle, GApp } from "./core/index.js"
 /**@import {Signal} from "./core" */
 
 /**
@@ -7,7 +7,6 @@ import { html, $signal, $effect, $ref, createRoot, css, useLifecycle } from "./c
  * @param {()=>void} param0.onDelete 
  */
 function TodoItem({ description, onDelete }){
-
       const style = css`
             div {
                   border-radius: 10px;
@@ -33,7 +32,7 @@ function TodoItem({ description, onDelete }){
       `;
       
       return html`
-            <span key=${style}></span>
+            <span scope=${style}></span>
             <div>
                   <p>${description}</p>
                   <button @click=${ onDelete }> delete </button>
@@ -46,6 +45,7 @@ function TodoItem({ description, onDelete }){
  * @param {Signal<string[]>} param0.list 
  */
 function TodoList({ list }){
+
       /**
        * 
        * @param {number} i 
@@ -54,10 +54,9 @@ function TodoList({ list }){
             list.value.splice( i, 1 );
             list.value = list.value;
       }
-
-      return list.map( 
-            (v,i) => TodoItem({ description: v, onDelete: () => onDelete(i) }) 
-      )
+      return html`${list.map( 
+            (v,i) => i%2 ? html`<TodoItem description=${v} onDelete=${() => onDelete(i)} id='prova'/>`: html`<TodoItem description=${v} onDelete=${() => onDelete(i)} id='prova1'/>`
+      )}`
 }
 
 const NewTodo = useLifecycle( ({ onMount, onDispose }) => ({ onAdded }) => {
@@ -134,19 +133,20 @@ function App(){
             }
       `;
 
+      
       return html`
             <style key=${style}></style>
             <div>
-                  <${NewTodo({ 
-                        /**@param {string} d*/
-                        onAdded: d => {
-                              todoList.value.push(d)
-                              todoList.value = todoList.value;
-                        }
-                  })}/>
-
-                  <${TodoList({ list: todoList })}/>
+                  <NewTodo onAdded=${/**@param {string} d*/ d => {
+                        todoList.value.push(d)
+                        todoList.value = todoList.value;
+                  }}/>
+                  <TodoList list=${todoList}/>
             </div>
       `
 }
-createRoot( App(), document.body );
+GApp
+.registerComponent( NewTodo, 'NewTodo' )
+.registerComponent(TodoList)
+.registerComponent(TodoItem)
+.createRoot(App(), document.body)

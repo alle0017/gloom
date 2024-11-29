@@ -1,10 +1,8 @@
 import Effect from "./reactivity/effect.js";
 import Signal from "./reactivity/signal.js";
 import Component from "./template/component.js";
-
 export { css } from "./css/index.js";
 export { Signal, Component, Effect };
-
 /**
  * 
  * @param {TemplateStringsArray} strings 
@@ -191,16 +189,30 @@ export const useLifecycle = factory => {
             return component
       }
 }
+export const GApp = {
+      /**
+       * 
+       * @param {(args: Record<string,unknown>) => Component} component 
+       * @param {string} name 
+       */
+      registerComponent( component, name ) {
+            if( !component.name && !name ){
+                  throw new Error('component can be registered because is anonymous. Probably is the result of an high-order function call. In this case, explicitly pass a name as argument of the "registerComponent"')
+            }
 
-/**
- * @abstract
- * needs to implement aa render function 
- * that returns the actual html. properties are passed
- * like any functional component. The big difference is
- * that, with class components, you can handle lifecycle.
- * note also that, the &lt;style> tag is already scoped, so you
- * don't need css function
- */
-export class WebComponent {
-
+            Component.__register.set(
+                  name? name : component.name,
+                  component
+            );
+            return this;
+      },
+      /**
+       * 
+       * @param {Component} component 
+       * @param {HTMLElement} root
+       */
+      createRoot( component, root ){
+            root.append( ...component.render({ tree: [], args: [], refToArgs: [], idx: 0 }) );
+            return this;
+      }
 }

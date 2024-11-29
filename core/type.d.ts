@@ -90,6 +90,7 @@ type ArgFlags = {
       isSubscription: boolean;
       isEvent: boolean;
       isCssKey: boolean;
+      isRegisteredComponent: boolean;
 }
 type Args = {
       // required
@@ -100,6 +101,12 @@ type Args = {
       subscription?: ListNode<()=>void>[];
       ref?: Ref<HTMLElement>;
       children?: Tree;
+      props?: Record<string, unknown>
+      component?: {
+            name: string
+            instance: import("./template/component").default;
+      };
+      boundKeys?: string[]
 } & Partial<ArgFlags>;
 
 type Ref<T extends HTMLElement> = {
