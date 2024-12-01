@@ -161,7 +161,6 @@ export default class Component {
             let res;
 
             if( component instanceof Component ){
-
                   res = dom.createComponent( 
                         component, 
                         leaf, 
@@ -179,7 +178,8 @@ export default class Component {
                         res.usedArgs > numOfArgs? 
                               res.usedArgs - numOfArgs:
                               numOfArgs;
-
+                              
+                  res.skipAttributes = true;
             }else if( isComponentList( component ) ){
 
                   res = dom.createComponentList( 
@@ -199,6 +199,7 @@ export default class Component {
                         res.usedArgs > numOfArgs? 
                               res.usedArgs - numOfArgs:
                               numOfArgs;
+                  res.skipAttributes = true;
                   /*res = dom.createComponentList( component, leaf, args.slice( idx + numOfArgs, idx + leaf.numOfInterpolations ), refToArgs, refIdx + numOfArgs );
                   root = document.createTextNode('');
 
@@ -210,6 +211,8 @@ export default class Component {
                         ...dom.createElement( leaf.tagName, leaf ),
                         needAttributes: false,
                         usedArgs: numOfArgs,
+                        // skip the "skipping-phase"
+                        skipAttributes: true,
                   };
                   root = res.tag[0];
             }
@@ -242,6 +245,7 @@ export default class Component {
        * @param {number} idx 
        * @param {number} refIdx represents the index used by refToArgs
        * @param {Args[]} refToArgs
+       * @returns {RenderingResult}
        */
       #createElement( leaf, args, idx, refToArgs, refIdx ) {
 
@@ -338,6 +342,7 @@ export default class Component {
             return {
                   ...res,
                   usedArgs: 1,
+
             };
       }
 
@@ -531,13 +536,15 @@ export default class Component {
                   const { 
                         tag: tagList, 
                         needAttributes, 
-                        usedArgs 
+                        usedArgs,
+                        skipAttributes
                   } = this.#createElement( leaf, args, idx, refToArgs, refIdx );
 
                   fatherList.push( ...tagList );
 
                   idx += usedArgs;
                   refIdx += usedArgs;
+
 
                   if( needAttributes ){
                         const usedArgs = this.#setAttributes( 
@@ -553,7 +560,7 @@ export default class Component {
                         // args
                         refIdx += (usedArgs - idx);
                         idx = usedArgs;
-                  }else{
+                  }else if( !skipAttributes ){
                         for( let j = 0; j < leaf.attributes.length; j++ ){
                               if( leaf.attributes[j][1] == ComponentParser.pointerToReactive ){
 
@@ -605,11 +612,11 @@ export default class Component {
                   // watch dom.createFromAnyReactive for debugging purposes
 
                   const subs = this.#refToArgs[i].subscription;
-                  for( let i = 0; i < subs.length; i++ ){
-                        subs[i].value();
+                  for( let j = 0; j < subs.length; j++ ){
+                        subs[j].value();
                         List.remove( 
                               this.#subs, 
-                              subs[i] 
+                              subs[j] 
                         );
                   }
                   
@@ -617,6 +624,7 @@ export default class Component {
                   // free the reference
                   this.#refToArgs[i].ref.element = null;
             }else if( this.#refToArgs[i].isEvent ){
+
                   const roots = this.#refToArgs[i].root;
 
                   for( let j = 0; j < roots.length; j++ ){
@@ -627,18 +635,26 @@ export default class Component {
                         );
                   }
             }
+
       }
       /**
        * if the old arg is different from the new arg, it updates it and mark
        * the corresponding refToArgs as dirty, so that the fw 
        * now where it needs to update.
        * @param  {...unknown} args 
+       * @returns {number[]}
        */
       #updateInternalState( ...args ){
+
             const toUpdate = [];
+
+
+
+
             for( let i = 0; i < args.length; i++ ){
                   const self = this.#args[i];
                   const other = args[i];
+
 
                   if( this.#refToArgs[i].isRegisteredComponent ){
                         // skip the component used properties
@@ -652,12 +668,11 @@ export default class Component {
 
 
                         if( self.isEqualTo( other ) ){
-                              self.update( ...other.#args );
+                              self.update( this.#refToArgs[i].props );
                         }else{
                               self.dispose();
                               this.#refToArgs[i].component.instance = other;
                         }
-
                         i += this.#refToArgs[i].boundKeys.length;
                   }
 
@@ -665,7 +680,7 @@ export default class Component {
                         continue;
                   }
 
-                  toUpdate.push( i );
+                  toUpdate.push(i);
 
 
                   if( self instanceof Component && other instanceof Component ){
@@ -738,7 +753,7 @@ export default class Component {
                               this.#refToArgs[i].isSubscription = true;
                               this.#refToArgs[i].subscription = [];
 
-                              for( let i = 0; i < this.#refToArgs[i].root.length; i++ ){
+                              for( let j = 0; j < this.#refToArgs[i].root.length; j++ ){
                                     const unsubscribe = other.subscribe({
                                           isComponent: this.#refToArgs[i].isComponent,
                                           root: this.#refToArgs[i].root[i],
@@ -767,11 +782,10 @@ export default class Component {
                               this.#refToArgs[i].isTextNode || 
                               this.#refToArgs[i].isTagName || 
                               this.#refToArgs[i].isAttributeValue || 
-                              this.#refToArgs[i].isEvent || 
-                              this.#refToArgs[i].isCssKey 
+                              this.#refToArgs[i].isEvent
                         ){
                               this.#clearReferences( i );
-                        }else{
+                        }else if( !this.#refToArgs[i].isCssKey ){
                               throw new TypeError("no match for the type you are interpolating");
                         }
 
@@ -793,10 +807,12 @@ export default class Component {
 
             for( let j = 0; j < toUpdate.length; j++ ){
 
+
                   const i = toUpdate[j];
                   const self = this.#args[i];
                   const roots = this.#refToArgs[i].root;
                   let value = self;
+
 
                   if(  self instanceof Effect ){
                         value = self.state;
@@ -825,7 +841,8 @@ export default class Component {
                         }
                   }else if(  this.#refToArgs[i].isRef ){
                         // only the last root is used
-                        /**@type {Ref<HTMLElement>}*/(self).element = /**@type {HTMLElement}*/(this.#refToArgs[i].root.at(-1));
+                        //@ts-ignore
+                        self.element = roots.at(-1);
                   }else if(  this.#refToArgs[i].isTextNode ){
 
                         for( let i = 0; i < roots.length; i++ ){
@@ -845,6 +862,7 @@ export default class Component {
                               }
                         }
                   }
+
             }
 
             return components;

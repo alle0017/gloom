@@ -42,6 +42,10 @@ type RenderingResult = {
       tag: HTMLElement[] | Text[];
       needAttributes: boolean;
       usedArgs: number;
+      // not only it doesn't need to 
+      // use attributes, but need to skip the 
+      // "skip unutilized interpolations"
+      skipAttributes: boolean;
 }
 /*
 type Effect<T> = {

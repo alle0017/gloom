@@ -47,11 +47,13 @@ export const createElement = ( name, leaf ) => {
             return {
                   tag: [cloneText( leaf, name )],
                   needAttributes: false,
+                  skipAttributes: false,
             };
       }
       return {
             tag: [cloneElement( leaf, name )],
             needAttributes: true,
+            skipAttributes: false,
       };
 }
 // TODO add the reference (refToArgs) when the component is created
@@ -74,6 +76,7 @@ export const createComponent = ( component, leaf, args, refToArgs, refIdx ) => {
             }),
             usedArgs: leaf.numOfInterpolations,
             needAttributes: false,
+            skipAttributes: false,
       };
  }
 
@@ -95,6 +98,7 @@ export const createComponentList = ( components, leaf, args, refToArgs, refIdx )
                   tag: tree,
                   usedArgs: leaf.numOfInterpolations,
                   needAttributes: false,
+                  skipAttributes: false,
             }
       }
       
@@ -111,6 +115,7 @@ export const createComponentList = ( components, leaf, args, refToArgs, refIdx )
             tag: tree,
             usedArgs: leaf.numOfInterpolations,
             needAttributes: false,
+            skipAttributes: false,
       };
 }
 
@@ -123,6 +128,7 @@ export const createComponentList = ( components, leaf, args, refToArgs, refIdx )
  * @param {number} idx
  * @param {number} refIdx represents the index used by refToArgs
  * @param {Args[]} refToArgs
+ * @returns {{ res: RenderingResult, unsubscribe: () => void }}
  */
 export const createFromAnyReactive = ( reactive, value, leaf, args, idx, refToArgs, refIdx )=>{
 
@@ -227,6 +233,7 @@ export const createFromAnyReactive = ( reactive, value, leaf, args, idx, refToAr
                         usedArgs: 1,
                         needAttributes: false,
                         tag: [ref],
+                        skipAttributes: false,
                   },
                   unsubscribe,
             }
@@ -261,6 +268,7 @@ export const createFromAnyReactive = ( reactive, value, leaf, args, idx, refToAr
                         usedArgs: 1,
                         needAttributes: true,
                         tag: [ref],
+                        skipAttributes: false,
                   },
                   unsubscribe,
             }
