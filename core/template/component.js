@@ -48,6 +48,10 @@ export default class Component {
        */
       static __register = new Map();
 
+      static #id = 0;;
+
+      #pid;
+
       /**
        * @type {Array<string>}
        */
@@ -119,6 +123,7 @@ export default class Component {
                   });
             }
 
+            this.#pid = Component.#id++;
             this.#refToArgs = new Array( args.length );
             this.#args = args;
       }
@@ -648,9 +653,6 @@ export default class Component {
 
             const toUpdate = [];
 
-
-
-
             for( let i = 0; i < args.length; i++ ){
                   const self = this.#args[i];
                   const other = args[i];
@@ -676,7 +678,14 @@ export default class Component {
                         i += this.#refToArgs[i].boundKeys.length;
                   }
 
-                  if( self == other ){
+                  if( self == other || 
+                        typeof self == 'object' && 
+                        typeof other == 'object' && 
+                        !(self instanceof Component) &&
+                        !(other instanceof Component) && 
+                        !isComponentList(self) &&
+                        !isComponentList(other)
+                  ){
                         continue;
                   }
 
@@ -707,6 +716,7 @@ export default class Component {
                                     s.update( ...o.#args );
                               }else{
                                     s.dispose();
+
                                     self[j] = o;
                               }
                         }
@@ -804,6 +814,7 @@ export default class Component {
        */
       #updateAttributes( toUpdate ){
             const components = [];
+
 
             for( let j = 0; j < toUpdate.length; j++ ){
 
@@ -917,6 +928,7 @@ export default class Component {
        */
       render( children ){
             if( this.#root && this.#root.length > 0 ){
+                  
                   for( let i = 0; i < this.__mount.length; i++ ){
                         this.__mount[i]()
                   }
